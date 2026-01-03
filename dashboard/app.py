@@ -3,9 +3,8 @@ import os
 import time
 import datetime
 
-# ---------------- FIX 1: SINGLE ROOT PATH SETUP ----------------
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-sys.path.insert(0, ROOT_DIR)
+sys.path.append(ROOT_DIR)
 
 import streamlit as st
 import pandas as pd
@@ -15,6 +14,7 @@ import matplotlib.pyplot as plt
 
 from explainability.explainer import explain_prediction
 from utils.recommender import recommend
+from genai.insight_engine import generate_batch_insight
 
 # ---------------- PAGE CONFIG ----------------
 st.set_page_config(page_title="BatchMind AI", layout="wide")
@@ -65,16 +65,13 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# ---------------- FIX 2: ABSOLUTE MODEL PATHS ----------------
-MODEL_PATH = os.path.join(ROOT_DIR, "models", "deviation_model.pkl")
-SCALER_PATH = os.path.join(ROOT_DIR, "models", "scaler.pkl")
-
-model = joblib.load(MODEL_PATH)
-scaler = joblib.load(SCALER_PATH)
+# ---------------- LOAD MODEL ----------------
+model = joblib.load("models/deviation_model.pkl")
+scaler = joblib.load("models/scaler.pkl")
 
 # ---------------- TITLE ----------------
 st.markdown(
-    "<div class='section-title'>BatchMind AI – Explainable & Predictive Intelligence for Manufacturing</div>",
+    "<div class='section-title'>BatchMind AI – Explainable, Predictive & Generative Intelligence for Manufacturing</div>",
     unsafe_allow_html=True
 )
 
@@ -87,10 +84,10 @@ LOSS_RATE = 0.20
 ALERT_THRESHOLD = 50000
 
 # ---------------- SIDEBAR ----------------
-st.sidebar.header("⚙️ Batch Control Mode")
+st.sidebar.header("Batch Control Mode")
 mode = st.sidebar.radio("Select Mode", ["Manual Mode", "Live Mode"])
 
-st.sidebar.header("📊 Simulate Batch Parameters")
+st.sidebar.header("Simulate Batch Parameters")
 
 if mode == "Manual Mode":
     temperature = st.sidebar.slider("Temperature", 40, 100, 70)
@@ -113,11 +110,13 @@ input_df = pd.DataFrame([{
     "machine_load": machine_load
 }])
 
-run_simulation = st.button("▶️ Run Batch Simulation") or mode == "Live Mode"
+batch_input = input_df.iloc[0].to_dict()
+
+run_simulation = st.button("Run Batch Simulation") or mode == "Live Mode"
 
 # ---------------- MAIN LOGIC ----------------
 if run_simulation:
-    with st.spinner("Analyzing batch..."):
+    with st.spinner("Analyzing batch"):
         time.sleep(1)
 
     risk_score = model.predict_proba(scaler.transform(input_df))[0][1]
@@ -141,12 +140,13 @@ if run_simulation:
         st.markdown(
             f"""
             <div class="alert-box">
-                ⚠️ ALERT: Expected financial loss exceeds ₹{ALERT_THRESHOLD:,}. Immediate attention required.
+                ALERT: Expected financial loss exceeds ₹{ALERT_THRESHOLD:,}. Immediate attention required.
             </div>
             """,
             unsafe_allow_html=True
         )
 
+    # ---------------- METRICS ----------------
     c1, c2, c3, c4 = st.columns(4)
 
     with c1:
@@ -163,7 +163,7 @@ if run_simulation:
 
     with c3:
         st.markdown(
-            f"<div class='card'><div class='metric-label'>Estimated Loss (₹)</div><div class='metric-value'>₹{int(expected_loss):,}</div></div>",
+            f"<div class='card'><div class='metric-label'>Estimated Loss</div><div class='metric-value'>₹{int(expected_loss):,}</div></div>",
             unsafe_allow_html=True
         )
 
@@ -173,6 +173,7 @@ if run_simulation:
             unsafe_allow_html=True
         )
 
+    # ---------------- EXPLAINABILITY ----------------
     explanations, importance_df, top_features = explain_prediction(model, input_df)
     recommendations = recommend(top_features)
 
@@ -180,7 +181,7 @@ if run_simulation:
     col1, col2 = st.columns(2)
 
     with col1:
-        st.subheader("Why is this batch risky?")
+        st.subheader("Why is this batch risky")
         for e in explanations:
             st.write("•", e)
 
@@ -189,21 +190,37 @@ if run_simulation:
         for r in recommendations:
             st.write("•", r)
 
+    # ---------------- GENAI INSIGHTS ----------------
+    st.markdown("<div class='section-title'>AI Generated Manufacturing Insights</div>", unsafe_allow_html=True)
+
+    ai_insight = generate_batch_insight(
+        prediction_label=risk_level,
+        prediction_score=risk_score,
+        top_features=[(f, "high") for f in top_features],
+        batch_data=batch_input
+    )
+
+    st.markdown(f"<div class='card'>{ai_insight}</div>", unsafe_allow_html=True)
+
+    # ---------------- VISUALS ----------------
     st.markdown("<div class='section-title'>Risk Analysis</div>", unsafe_allow_html=True)
     g1, g2 = st.columns(2)
 
     with g1:
         fig1, ax1 = plt.subplots(figsize=(3.2, 2.2), dpi=120)
-        ax1.barh(importance_df["feature"], importance_df["importance"], color="#5dade2")
+        ax1.barh(importance_df["feature"], importance_df["importance"])
         ax1.invert_yaxis()
-        st.pyplot(fig1, use_container_width=False)
+        st.pyplot(fig1)
 
     with g2:
         trend = np.clip(np.random.normal(risk_score, 0.05, 10), 0, 1)
         fig2, ax2 = plt.subplots(figsize=(3.2, 2.2), dpi=120)
-        ax2.plot(trend, marker="o", color="#8e44ad")
+        ax2.plot(trend, marker="o")
         ax2.set_ylim(0, 1)
-        st.pyplot(fig2, use_container_width=False)
+        st.pyplot(fig2)
+
+    # ---------------- HISTORY ----------------
+    st.markdown("<div class='section-title'>Recent Batch History</div>", unsafe_allow_html=True)
 
     st.session_state.history.append({
         "time": datetime.datetime.now().strftime("%H:%M:%S"),
@@ -212,8 +229,8 @@ if run_simulation:
         "severity": severity,
         "loss": int(expected_loss)
     })
-    st.session_state.history = st.session_state.history[-5:]
 
+    st.session_state.history = st.session_state.history[-5:]
     st.table(pd.DataFrame(st.session_state.history))
 
     if mode == "Live Mode":
