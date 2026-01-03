@@ -1,5 +1,6 @@
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
+import joblib
 
 def preprocess():
     df = pd.read_csv("data/raw/batch_data.csv")
@@ -15,7 +16,8 @@ def preprocess():
 
     processed.to_csv("data/processed/batch_data_processed.csv", index=False)
 
-    return scaler
+    # SAVE SCALER
+    joblib.dump(scaler, "models/scaler.pkl")
 
 if __name__ == "__main__":
     preprocess()
