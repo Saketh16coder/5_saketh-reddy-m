@@ -186,7 +186,7 @@ export OPENAI_API_KEY="your_api_key_here"
 Restart the terminal before running the dashboard.
 
 If the API key is not set or external access is unavailable, the system automatically falls back to a deterministic AI insight generator to ensure uninterrupted functionality.
-```
+
 
 
 2. Train the model:
@@ -217,4 +217,4 @@ streamlit run dashboard/app.py
 ## Conclusion
 
 BatchMind AI integrates predictive machine learning, explainable AI, business impact analysis, and Generative AI–based insight generation into a single system for proactive manufacturing deviation prevention.
-```
+
